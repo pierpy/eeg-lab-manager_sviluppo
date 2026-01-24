@@ -1,104 +1,149 @@
-
 import { User, Experiment, Session } from "../types";
-
-/**
- * GUIDA ALLA PRODUZIONE:
- * Per connettersi a Supabase, installa @supabase/supabase-js e sostituisci
- * i blocchi localStorage con chiamate: 
- * const { data } = await supabase.from('experiments').select('*')
- */
-
-const USERS_KEY = 'eeg_lab_users_db';
-const EXPS_KEY = 'eeg_lab_experiments_db';
-const INVITES_KEY = 'eeg_lab_invites_db';
-const INITIAL_INVITE = 'LAB-2025';
-
-// Simuliamo una latenza di rete reale per testare l'esperienza utente
-const networkDelay = () => new Promise(res => setTimeout(res, 400));
+import { supabase } from "./supabaseClient";
 
 export const dataService = {
   // Gestione Utenti
   getUsers: async (): Promise<User[]> => {
-    await networkDelay();
-    return JSON.parse(localStorage.getItem(USERS_KEY) || '[]');
+    const { data, error } = await supabase.from('users').select('*');
+    if (error) {
+      console.error("Errore fetch utenti:", error);
+      throw error;
+    }
+    return data as User[];
   },
   
   saveUser: async (user: User) => {
-    await networkDelay();
-    const users = await dataService.getUsers();
-    localStorage.setItem(USERS_KEY, JSON.stringify([...users, user]));
+    const { error } = await supabase.from('users').insert([{
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role
+    }]);
+    if (error) throw error;
   },
 
   findUser: async (email: string): Promise<User | undefined> => {
-    const users = await dataService.getUsers();
-    return users.find(u => u.email.toLowerCase() === email.toLowerCase());
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .maybeSingle(); // maybeSingle non lancia errore se non trova nulla
+    
+    if (error) {
+      console.error("Errore ricerca utente:", error);
+      throw error;
+    }
+    return data || undefined;
   },
 
   updateUserRole: async (userId: string, newRole: 'Admin' | 'Researcher') => {
-    await networkDelay();
-    const users = await dataService.getUsers();
-    const updated = users.map(u => u.id === userId ? { ...u, role: newRole } : u);
-    localStorage.setItem(USERS_KEY, JSON.stringify(updated));
+    const { error } = await supabase
+      .from('users')
+      .update({ role: newRole })
+      .eq('id', userId);
+    if (error) throw error;
   },
 
-  // Gestione Inviti (In produzione questo andrebbe su una tabella sicura)
-  getInvites: async (): Promise<string[]> => {
-    const invites = localStorage.getItem(INVITES_KEY);
-    if (!invites) {
-      const initial = [INITIAL_INVITE];
-      localStorage.setItem(INVITES_KEY, JSON.stringify(initial));
-      return initial;
-    }
-    return JSON.parse(invites);
-  },
-
+  // Gestione Inviti
   generateInvite: async (): Promise<string> => {
-    await networkDelay();
     const code = 'INV-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-    const invites = await dataService.getInvites();
-    localStorage.setItem(INVITES_KEY, JSON.stringify([...invites, code]));
+    const { error } = await supabase.from('invites').insert([{ code, role: 'Researcher' }]);
+    if (error) throw error;
     return code;
   },
 
   validateAndUseInvite: async (code: string): Promise<'Admin' | 'Researcher' | null> => {
-    await networkDelay();
-    const invites = await dataService.getInvites();
     const normalizedCode = code.trim().toUpperCase();
+    const { data, error } = await supabase
+      .from('invites')
+      .select('role')
+      .eq('code', normalizedCode)
+      .single();
     
-    if (invites.includes(normalizedCode)) {
-      if (normalizedCode !== INITIAL_INVITE) {
-        const remaining = invites.filter(c => c !== normalizedCode);
-        localStorage.setItem(INVITES_KEY, JSON.stringify(remaining));
-      }
-      return normalizedCode === INITIAL_INVITE ? 'Admin' : 'Researcher';
+    if (error || !data) return null;
+
+    if (normalizedCode !== 'LAB-2025') {
+      await supabase.from('invites').delete().eq('code', normalizedCode);
     }
-    return null;
+    
+    return data.role as 'Admin' | 'Researcher';
   },
 
   // Gestione Esperimenti
   getExperiments: async (userId: string): Promise<Experiment[]> => {
-    await networkDelay();
-    const allExps: Experiment[] = JSON.parse(localStorage.getItem(EXPS_KEY) || '[]');
-    // In produzione: la query filtrata viene fatta dal database
-    return allExps.filter(e => e.userId === userId);
+    const { data, error } = await supabase
+      .from('experiments')
+      .select('*, sessions(*)')
+      .eq('user_id', userId)
+      .order('start_date', { ascending: false });
+    
+    if (error) throw error;
+
+    // Supabase restituisce le sessioni annidate come camel_case o snake_case a seconda dei nomi colonne.
+    // Mappiamo i dati per matchare le nostre interfacce TS.
+    return (data || []).map((exp: any) => ({
+      ...exp,
+      userId: exp.user_id,
+      startDate: exp.start_date,
+      sessions: (exp.sessions || []).map((s: any) => ({
+        id: s.id,
+        experimentId: s.experiment_id,
+        subjectId: s.subject_id,
+        date: s.date,
+        durationMinutes: s.duration_minutes,
+        samplingRate: s.sampling_rate,
+        channelCount: s.channel_count,
+        notes: s.notes,
+        technicianName: s.technician_name
+      }))
+    })) as Experiment[];
   },
 
   saveExperiment: async (exp: Experiment) => {
-    await networkDelay();
-    const allExps: Experiment[] = JSON.parse(localStorage.getItem(EXPS_KEY) || '[]');
-    localStorage.setItem(EXPS_KEY, JSON.stringify([...allExps, exp]));
+    const { error } = await supabase.from('experiments').insert([{
+      id: exp.id,
+      user_id: exp.userId,
+      title: exp.title,
+      description: exp.description,
+      status: exp.status,
+      start_date: exp.startDate
+    }]);
+    if (error) throw error;
   },
 
   updateExperiment: async (updatedExp: Experiment) => {
-    await networkDelay();
-    const allExps: Experiment[] = JSON.parse(localStorage.getItem(EXPS_KEY) || '[]');
-    const newExps = allExps.map(e => e.id === updatedExp.id ? updatedExp : e);
-    localStorage.setItem(EXPS_KEY, JSON.stringify(newExps));
+    const { error: expError } = await supabase
+      .from('experiments')
+      .update({
+        title: updatedExp.title,
+        description: updatedExp.description,
+        status: updatedExp.status
+      })
+      .eq('id', updatedExp.id);
+    
+    if (expError) throw expError;
+
+    // Sincronizzazione sessioni
+    for (const sess of updatedExp.sessions) {
+      const { error: sessError } = await supabase
+        .from('sessions')
+        .upsert([{
+          id: sess.id,
+          experiment_id: updatedExp.id,
+          subject_id: sess.subjectId,
+          date: sess.date,
+          duration_minutes: sess.durationMinutes,
+          sampling_rate: sess.samplingRate,
+          channel_count: sess.channelCount,
+          notes: sess.notes,
+          technician_name: sess.technicianName
+        }]);
+      if (sessError) throw sessError;
+    }
   },
 
   deleteExperiment: async (id: string) => {
-    await networkDelay();
-    const allExps: Experiment[] = JSON.parse(localStorage.getItem(EXPS_KEY) || '[]');
-    localStorage.setItem(EXPS_KEY, JSON.stringify(allExps.filter(e => e.id !== id)));
+    const { error } = await supabase.from('experiments').delete().eq('id', id);
+    if (error) throw error;
   }
 };
