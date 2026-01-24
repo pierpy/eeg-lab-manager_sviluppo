@@ -7,7 +7,7 @@ export const dataService = {
   getUsers: async (): Promise<User[]> => {
     const { data, error } = await supabase.from('users').select('*');
     if (error) {
-      console.error("Errore fetch utenti:", error);
+      console.error("Errore fetch utenti:", error.message);
       throw error;
     }
     return data as User[];
@@ -24,17 +24,22 @@ export const dataService = {
   },
 
   findUser: async (email: string): Promise<User | undefined> => {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('email', email)
-      .maybeSingle(); // maybeSingle non lancia errore se non trova nulla
-    
-    if (error) {
-      console.error("Errore ricerca utente:", error);
-      throw error;
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .maybeSingle();
+      
+      if (error) {
+        if (error.code === 'PGRST116') return undefined; // Nessun risultato
+        throw error;
+      }
+      return data || undefined;
+    } catch (err: any) {
+      console.error("Errore ricerca utente:", err.message);
+      return undefined;
     }
-    return data || undefined;
   },
 
   updateUserRole: async (userId: string, newRole: 'Admin' | 'Researcher') => {
@@ -61,8 +66,12 @@ export const dataService = {
       .eq('code', normalizedCode)
       .single();
     
-    if (error || !data) return null;
+    if (error || !data) {
+      console.error("Validazione invito fallita:", error?.message);
+      return null;
+    }
 
+    // Non eliminiamo il codice master per permettere test multipli
     if (normalizedCode !== 'LAB-2025') {
       await supabase.from('invites').delete().eq('code', normalizedCode);
     }
@@ -78,10 +87,11 @@ export const dataService = {
       .eq('user_id', userId)
       .order('start_date', { ascending: false });
     
-    if (error) throw error;
+    if (error) {
+      console.error("Errore fetch esperimenti:", error.message);
+      throw error;
+    }
 
-    // Supabase restituisce le sessioni annidate come camel_case o snake_case a seconda dei nomi colonne.
-    // Mappiamo i dati per matchare le nostre interfacce TS.
     return (data || []).map((exp: any) => ({
       ...exp,
       userId: exp.user_id,
@@ -124,7 +134,6 @@ export const dataService = {
     
     if (expError) throw expError;
 
-    // Sincronizzazione sessioni
     for (const sess of updatedExp.sessions) {
       const { error: sessError } = await supabase
         .from('sessions')
