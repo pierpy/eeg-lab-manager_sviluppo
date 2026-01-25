@@ -1,12 +1,12 @@
 
-import React from 'react';
-import { User } from '../types';
+import * as React from 'react';
+import { User, View } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;
   user: User | null;
   onLogout: () => void;
-  onNavigate: (view: any) => void;
+  onNavigate: (view: View) => void;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children, user, onLogout, onNavigate }) => {
