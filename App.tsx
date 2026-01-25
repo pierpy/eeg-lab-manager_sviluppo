@@ -297,7 +297,12 @@ const App: React.FC = () => {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <div className="col-span-full flex items-center justify-between px-2">
               <h3 className="text-lg font-black text-slate-800">I tuoi Esperimenti</h3>
-              <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">{experiments.length}</span>
+              <div className="flex items-center space-x-2">
+                {user?.role === 'Admin' && (
+                  <button onClick={() => setCurrentView('MANAGE_USERS')} className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full hover:bg-slate-200 transition-colors">Admin Panel</button>
+                )}
+                <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">{experiments.length}</span>
+              </div>
             </div>
             {experiments.length === 0 && !isLoading && (
               <div className="col-span-full py-16 text-center bg-white rounded-[2.5rem] border-2 border-dashed border-slate-100">
@@ -468,34 +473,73 @@ const App: React.FC = () => {
 
       {currentView === 'MANAGE_USERS' && user?.role === 'Admin' && (
         <div className="max-w-4xl mx-auto space-y-8 view-enter pb-24">
-          <div className="bg-white p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
-            <div className="flex justify-between items-center mb-10">
-              <h2 className="text-3xl font-black">Team del Lab</h2>
-              <button onClick={async () => { const code = await dataService.generateInvite(); setGeneratedInvite(code); }} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold text-xs uppercase shadow-lg">Crea Invito</button>
+          <div className="bg-white p-6 sm:p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-4">
+              <h2 className="text-3xl font-black text-slate-900 tracking-tight italic">Team del Lab</h2>
+              <button 
+                onClick={async () => { 
+                  setIsActionLoading(true);
+                  try {
+                    const code = await dataService.generateInvite(); 
+                    setGeneratedInvite(code); 
+                  } catch (e) {
+                    alert("Errore generazione invito");
+                  } finally {
+                    setIsActionLoading(false);
+                  }
+                }} 
+                className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95 transition-all"
+              >
+                Crea Codice Invito
+              </button>
             </div>
+
             {generatedInvite && (
-              <div className="mb-10 p-6 bg-emerald-50 border-2 border-emerald-100 rounded-[2rem] flex justify-between items-center animate-bounce">
-                <div>
-                  <div className="text-[10px] font-black uppercase text-emerald-500 mb-1">Codice Invito Ricercatore:</div>
-                  <div className="text-2xl font-black text-emerald-700 tracking-widest">{generatedInvite}</div>
+              <div className="mb-10 p-6 bg-emerald-50 border-2 border-emerald-100 rounded-[2rem] flex flex-col sm:flex-row justify-between items-center animate-bounce gap-4">
+                <div className="text-center sm:text-left">
+                  <div className="text-[10px] font-black uppercase text-emerald-500 mb-1">Nuovo Codice Invito Ricercatore:</div>
+                  <div className="text-3xl font-black text-emerald-700 tracking-widest uppercase select-all">{generatedInvite}</div>
                 </div>
-                <button onClick={() => { navigator.clipboard.writeText(generatedInvite); alert("Copiato!"); }} className="bg-white text-emerald-600 px-6 py-3 rounded-2xl font-black text-xs">Copia</button>
+                <button 
+                  onClick={() => { 
+                    navigator.clipboard.writeText(generatedInvite); 
+                    alert("Codice Copiato in memoria!"); 
+                  }} 
+                  className="bg-white text-emerald-600 px-6 py-3 rounded-2xl font-black text-xs shadow-sm hover:shadow-md transition-shadow"
+                >
+                  COPIA CODICE
+                </button>
               </div>
             )}
+
             <div className="space-y-4">
+              <h3 className="text-xs font-black uppercase text-slate-400 tracking-widest ml-4 mb-2">Membri Attivi ({allUsers.length})</h3>
+              {allUsers.length === 0 && <p className="text-center text-slate-400 font-medium py-10 italic">Nessun ricercatore registrato oltre a te.</p>}
               {allUsers.map(u => (
-                <div key={u.id} className="flex justify-between items-center p-6 bg-slate-50 rounded-[2rem]">
-                  <div className="flex items-center space-x-4">
-                    <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-black">{u.name[0]}</div>
-                    <div>
-                      <div className="font-extrabold">{u.name}</div>
-                      <div className="text-xs text-slate-400">{u.email}</div>
+                <div key={u.id} className="flex flex-col sm:flex-row justify-between items-center p-6 bg-slate-50 rounded-[2rem] border border-transparent hover:border-slate-200 transition-all gap-4">
+                  <div className="flex items-center space-x-4 w-full">
+                    <div className="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-black text-xl shadow-inner uppercase">{u.name[0]}</div>
+                    <div className="truncate">
+                      <div className="font-extrabold text-slate-900 truncate">{u.name}</div>
+                      <div className="text-xs text-slate-400 truncate">{u.email}</div>
                     </div>
                   </div>
-                  <select value={u.role} onChange={(e) => dataService.updateUserRole(u.id, e.target.value as any).then(() => user && refreshData(user))} className="bg-white border-2 border-slate-100 rounded-xl text-xs font-black px-4 py-2">
-                    <option value="Admin">Admin</option>
-                    <option value="Researcher">Researcher</option>
-                  </select>
+                  <div className="flex items-center space-x-2 w-full sm:w-auto">
+                    <span className="text-[10px] font-black uppercase text-slate-300">Ruolo:</span>
+                    <select 
+                      value={u.role} 
+                      onChange={(e) => {
+                        const newRole = e.target.value as any;
+                        if (confirm(`Cambiare il ruolo di ${u.name} in ${newRole}?`)) {
+                          dataService.updateUserRole(u.id, newRole).then(() => user && refreshData(user));
+                        }
+                      }} 
+                      className="w-full sm:w-auto bg-white border-2 border-slate-100 rounded-xl text-[10px] font-black px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none uppercase tracking-tighter shadow-sm"
+                    >
+                      <option value="Admin">Admin</option>
+                      <option value="Researcher">Ricercatore</option>
+                    </select>
+                  </div>
                 </div>
               ))}
             </div>
