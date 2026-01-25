@@ -1,16 +1,17 @@
-
 import { User, Experiment, Session } from "../types";
 import { supabase } from "./supabaseClient";
 
 export const dataService = {
   // Gestione Utenti
   getUsers: async (): Promise<User[]> => {
-    const { data, error } = await supabase.from('users').select('*');
-    if (error) {
-      console.error("Errore fetch utenti:", error.message);
-      throw error;
+    try {
+      const { data, error } = await supabase.from('users').select('*');
+      if (error) throw error;
+      return data as User[];
+    } catch (error: any) {
+      console.warn("Accesso limitato alla lista utenti (normale per non-admin):", error.message);
+      return []; 
     }
-    return data as User[];
   },
   
   saveUser: async (user: User) => {
@@ -32,7 +33,7 @@ export const dataService = {
         .maybeSingle();
       
       if (error) {
-        if (error.code === 'PGRST116') return undefined; // Nessun risultato
+        if (error.code === 'PGRST116') return undefined;
         throw error;
       }
       return data || undefined;
@@ -71,7 +72,6 @@ export const dataService = {
       return null;
     }
 
-    // Non eliminiamo il codice master per permettere test multipli
     if (normalizedCode !== 'LAB-2025') {
       await supabase.from('invites').delete().eq('code', normalizedCode);
     }
@@ -80,12 +80,15 @@ export const dataService = {
   },
 
   // Gestione Esperimenti
-  getExperiments: async (userId: string): Promise<Experiment[]> => {
-    const { data, error } = await supabase
-      .from('experiments')
-      .select('*, sessions(*)')
-      .eq('user_id', userId)
-      .order('start_date', { ascending: false });
+  getExperiments: async (user: User): Promise<Experiment[]> => {
+    let query = supabase.from('experiments').select('*, sessions(*)');
+    
+    // Filtro cruciale: se non è admin, carica solo i suoi.
+    if (user.role !== 'Admin') {
+      query = query.eq('user_id', user.id);
+    }
+
+    const { data, error } = await query.order('start_date', { ascending: false });
     
     if (error) {
       console.error("Errore fetch esperimenti:", error.message);
@@ -134,26 +137,32 @@ export const dataService = {
     
     if (expError) throw expError;
 
-    for (const sess of updatedExp.sessions) {
-      const { error: sessError } = await supabase
-        .from('sessions')
-        .upsert([{
-          id: sess.id,
-          experiment_id: updatedExp.id,
-          subject_id: sess.subjectId,
-          date: sess.date,
-          duration_minutes: sess.durationMinutes,
-          sampling_rate: sess.samplingRate,
-          channel_count: sess.channelCount,
-          notes: sess.notes,
-          technician_name: sess.technicianName
-        }]);
+    // Aggiornamento/Inserimento sessioni
+    if (updatedExp.sessions.length > 0) {
+      const sessionsToUpsert = updatedExp.sessions.map(sess => ({
+        id: sess.id,
+        experiment_id: updatedExp.id,
+        subject_id: sess.subjectId,
+        date: sess.date,
+        duration_minutes: sess.durationMinutes,
+        sampling_rate: sess.samplingRate,
+        channel_count: sess.channelCount,
+        notes: sess.notes,
+        technician_name: sess.technicianName
+      }));
+      
+      const { error: sessError } = await supabase.from('sessions').upsert(sessionsToUpsert);
       if (sessError) throw sessError;
     }
   },
 
   deleteExperiment: async (id: string) => {
     const { error } = await supabase.from('experiments').delete().eq('id', id);
+    if (error) throw error;
+  },
+
+  deleteSession: async (sessionId: string) => {
+    const { error } = await supabase.from('sessions').delete().eq('id', sessionId);
     if (error) throw error;
   }
 };
