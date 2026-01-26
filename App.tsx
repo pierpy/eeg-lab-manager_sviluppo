@@ -36,12 +36,7 @@ const App: React.FC = () => {
   const [sessChannels, setSessChannels] = useState(32);
   const [sessNotes, setSessNotes] = useState('');
 
-  // Trova l'esperimento selezionato in modo sicuro (converte ID in stringa per il confronto)
-  const selectedExp = useMemo(() => {
-    if (!selectedExperimentId) return null;
-    return experiments.find(e => String(e.id) === String(selectedExperimentId)) || null;
-  }, [experiments, selectedExperimentId]);
-
+  // Sincronizzazione dati
   const refreshData = useCallback(async (activeUser: User) => {
     setIsLoading(true);
     try {
@@ -59,6 +54,7 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Inizializzazione sessione
   useEffect(() => {
     const init = async () => {
       const savedUser = localStorage.getItem('eeg_lab_active_user');
@@ -79,6 +75,28 @@ const App: React.FC = () => {
     init();
   }, [refreshData]);
 
+  // Memoizzazione esperimento selezionato
+  const selectedExp = useMemo(() => {
+    if (!selectedExperimentId) return null;
+    return experiments.find(e => String(e.id) === String(selectedExperimentId)) || null;
+  }, [experiments, selectedExperimentId]);
+
+  // Gestione Navigazione Centralizzata
+  const navigateTo = (view: View) => {
+    // Reset stati form quando si cambia vista
+    if (view === 'CREATE_EXPERIMENT') {
+      setExpTitle('');
+      setExpDesc('');
+      setExpStatus(ExperimentStatus.PLANNING);
+    }
+    if (view === 'DASHBOARD') {
+      setSelectedExperimentId(null);
+      setAiResponse(null);
+    }
+    setCurrentView(view);
+  };
+
+  // Handlers
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -88,9 +106,9 @@ const App: React.FC = () => {
         setUser(found);
         localStorage.setItem('eeg_lab_active_user', JSON.stringify(found));
         await refreshData(found);
-        setCurrentView('DASHBOARD');
+        navigateTo('DASHBOARD');
       } else {
-        alert("Email non trovata. Controlla le credenziali o registrati.");
+        alert("Email non trovata.");
       }
     } catch (err: any) {
       alert("Errore login: " + err.message);
@@ -106,7 +124,6 @@ const App: React.FC = () => {
       const role = await dataService.validateAndUseInvite(inviteCode);
       if (!role) {
         alert("Codice invito non valido.");
-        setIsLoading(false);
         return;
       }
       const newUser: User = { 
@@ -117,7 +134,7 @@ const App: React.FC = () => {
       setUser(newUser);
       localStorage.setItem('eeg_lab_active_user', JSON.stringify(newUser));
       await refreshData(newUser);
-      setCurrentView('DASHBOARD');
+      navigateTo('DASHBOARD');
     } catch (err: any) {
       alert("Errore registrazione: " + err.message);
     } finally {
@@ -141,8 +158,7 @@ const App: React.FC = () => {
       };
       await dataService.saveExperiment(newExp);
       await refreshData(user);
-      setCurrentView('DASHBOARD');
-      setExpTitle(''); setExpDesc('');
+      navigateTo('DASHBOARD');
     } catch (err: any) {
       alert("Errore creazione: " + err.message);
     } finally { 
@@ -157,7 +173,7 @@ const App: React.FC = () => {
     try {
       await dataService.updateExperiment({ ...selectedExp, title: expTitle, description: expDesc, status: expStatus });
       await refreshData(user);
-      setCurrentView('EXPERIMENT_DETAILS');
+      navigateTo('EXPERIMENT_DETAILS');
     } catch (err: any) {
       alert("Errore aggiornamento: " + err.message);
     } finally { setIsActionLoading(false); }
@@ -170,8 +186,7 @@ const App: React.FC = () => {
     try {
       await dataService.deleteExperiment(selectedExperimentId);
       await refreshData(user);
-      setCurrentView('DASHBOARD');
-      setSelectedExperimentId(null);
+      navigateTo('DASHBOARD');
     } catch (err: any) {
       alert("Errore eliminazione: " + err.message);
     } finally { setIsActionLoading(false); }
@@ -195,8 +210,7 @@ const App: React.FC = () => {
       };
       await dataService.updateExperiment({ ...selectedExp, sessions: [...selectedExp.sessions, newSession] });
       await refreshData(user);
-      setCurrentView('EXPERIMENT_DETAILS');
-      setSessSubj(''); setSessNotes('');
+      navigateTo('EXPERIMENT_DETAILS');
     } catch (err: any) {
       alert("Errore sessione: " + err.message);
     } finally { setIsActionLoading(false); }
@@ -214,7 +228,7 @@ const App: React.FC = () => {
       );
       await dataService.updateExperiment({ ...selectedExp, sessions: updatedSessions });
       await refreshData(user);
-      setCurrentView('EXPERIMENT_DETAILS');
+      navigateTo('EXPERIMENT_DETAILS');
     } catch (err: any) {
       alert("Errore aggiornamento sessione: " + err.message);
     } finally { setIsActionLoading(false); }
@@ -227,7 +241,7 @@ const App: React.FC = () => {
     try {
       await dataService.deleteSession(selectedSessionId);
       await refreshData(user);
-      setCurrentView('EXPERIMENT_DETAILS');
+      navigateTo('EXPERIMENT_DETAILS');
     } catch (err: any) {
       alert("Errore eliminazione sessione: " + err.message);
     } finally { setIsActionLoading(false); }
@@ -248,10 +262,13 @@ const App: React.FC = () => {
   };
 
   return (
-    <Layout user={user} onLogout={() => { setUser(null); localStorage.removeItem('eeg_lab_active_user'); setCurrentView('LOGIN'); }} onNavigate={(view) => { setCurrentView(view); if(view === 'DASHBOARD') setSelectedExperimentId(null); }}>
-      
+    <Layout 
+      user={user} 
+      onLogout={() => { setUser(null); localStorage.removeItem('eeg_lab_active_user'); navigateTo('LOGIN'); }} 
+      onNavigate={navigateTo}
+    >
       {(isLoading || isActionLoading) && (
-        <div className="fixed top-0 left-0 w-full h-1 bg-indigo-200 z-[100] overflow-hidden">
+        <div className="fixed top-0 left-0 w-full h-1 bg-indigo-200 z-[200] overflow-hidden">
           <div className="h-full bg-indigo-600 animate-[loading_1s_infinite_linear]"></div>
         </div>
       )}
@@ -264,7 +281,7 @@ const App: React.FC = () => {
             <input type="password" required placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-gray-50 border-none focus:ring-2 focus:ring-indigo-500 outline-none" />
             <button type="submit" disabled={isLoading} className="w-full bg-indigo-600 text-white font-bold py-5 rounded-2xl shadow-xl active:scale-95 transition-all">Accedi</button>
           </form>
-          <button onClick={() => setCurrentView('REGISTER')} className="w-full mt-6 text-indigo-600 font-bold py-2 text-sm border-t border-gray-50 pt-6 text-center block">Nuovo ricercatore? Registrati</button>
+          <button onClick={() => navigateTo('REGISTER')} className="w-full mt-6 text-indigo-600 font-bold py-2 text-sm border-t border-gray-50 pt-6 text-center block">Nuovo ricercatore? Registrati</button>
         </div>
       )}
 
@@ -278,7 +295,7 @@ const App: React.FC = () => {
             <input type="password" required placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-gray-50 border-none outline-none" />
             <button type="submit" className="w-full bg-indigo-600 text-white font-bold py-5 rounded-2xl shadow-xl mt-4">Crea Account</button>
           </form>
-          <button onClick={() => setCurrentView('LOGIN')} className="w-full mt-4 text-gray-400 font-bold text-sm text-center block">Torna al login</button>
+          <button onClick={() => navigateTo('LOGIN')} className="w-full mt-4 text-gray-400 font-bold text-sm text-center block">Torna al login</button>
         </div>
       )}
 
@@ -289,7 +306,7 @@ const App: React.FC = () => {
               <h1 className="text-3xl font-black">Ciao, {user?.name.split(' ')[0]}</h1>
               <p className="opacity-80 text-sm">Gestisci i tuoi protocolli EEG</p>
             </div>
-            <button onClick={() => setCurrentView('CREATE_EXPERIMENT')} className="relative z-10 bg-white text-indigo-600 p-5 rounded-2xl shadow-lg active:scale-95 transition-all">
+            <button onClick={() => navigateTo('CREATE_EXPERIMENT')} className="relative z-10 bg-white text-indigo-600 p-5 rounded-2xl shadow-lg active:scale-95 transition-all">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" /></svg>
             </button>
           </div>
@@ -299,7 +316,7 @@ const App: React.FC = () => {
               <h3 className="text-lg font-black text-slate-800">I tuoi Esperimenti</h3>
               <div className="flex items-center space-x-2">
                 {user?.role === 'Admin' && (
-                  <button onClick={() => setCurrentView('MANAGE_USERS')} className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full hover:bg-slate-200 transition-colors">Admin Panel</button>
+                  <button onClick={() => navigateTo('MANAGE_USERS')} className="text-xs font-bold text-slate-500 bg-slate-100 px-3 py-1 rounded-full hover:bg-slate-200 transition-colors">Admin Panel</button>
                 )}
                 <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">{experiments.length}</span>
               </div>
@@ -314,7 +331,7 @@ const App: React.FC = () => {
                 key={String(exp.id)} 
                 onClick={() => { 
                   setSelectedExperimentId(String(exp.id)); 
-                  setCurrentView('EXPERIMENT_DETAILS'); 
+                  navigateTo('EXPERIMENT_DETAILS'); 
                 }} 
                 className="bg-white p-6 rounded-[2.2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:border-indigo-200 transition-all cursor-pointer group active:scale-[0.98]"
               >
@@ -338,8 +355,8 @@ const App: React.FC = () => {
         <div className="space-y-6 view-enter pb-20">
           {!selectedExp ? (
             <div className="bg-white p-12 rounded-[2.5rem] text-center border border-slate-100">
-              <p className="text-slate-400 mb-6 font-bold">Caricamento esperimento o non trovato...</p>
-              <button onClick={() => setCurrentView('DASHBOARD')} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black">Torna alla Dashboard</button>
+              <p className="text-slate-400 mb-6 font-bold">Caricamento esperimento...</p>
+              <button onClick={() => navigateTo('DASHBOARD')} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl font-black">Torna alla Dashboard</button>
             </div>
           ) : (
             <>
@@ -353,7 +370,7 @@ const App: React.FC = () => {
                     setExpTitle(selectedExp.title); 
                     setExpDesc(selectedExp.description); 
                     setExpStatus(selectedExp.status); 
-                    setCurrentView('EDIT_EXPERIMENT'); 
+                    navigateTo('EDIT_EXPERIMENT'); 
                   }} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:text-indigo-600 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
                   </button>
@@ -368,7 +385,7 @@ const App: React.FC = () => {
                     <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 mr-2 ${aiLoading ? 'animate-spin' : ''}`} viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 10-2 0v1a1 1 0 102 0V3zM15.657 5.757a1 1 0 00-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707zM18 10a1 1 0 01-1 1h-1a1 1 0 110-2h1a1 1 0 011 1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zM5 10a1 1 0 01-1 1H3a1 1 0 110-2h1a1 1 0 011 1zM8 16v-1a1 1 0 112 0v1a1 1 0 11-2 0zM13.657 15.657a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414l.707.707zM16.464 14.95a1 1 0 10-1.414-1.414l-.707.707a1 1 0 001.414 1.414l.707-.707z" /></svg>
                     {aiLoading ? 'Analisi...' : 'Suggerimenti AI'}
                   </button>
-                  <button onClick={() => setCurrentView('ADD_SESSION')} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase shadow-lg active:scale-95 transition-all">Nuova Sessione</button>
+                  <button onClick={() => navigateTo('ADD_SESSION')} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase shadow-lg active:scale-95 transition-all">Nuova Sessione</button>
                 </div>
 
                 {aiResponse && (
@@ -396,7 +413,7 @@ const App: React.FC = () => {
                         setSessSampling(sess.samplingRate);
                         setSessChannels(sess.channelCount);
                         setSessNotes(sess.notes);
-                        setCurrentView('EDIT_SESSION'); 
+                        navigateTo('EDIT_SESSION'); 
                       }} className="p-4 bg-slate-50 rounded-2xl text-slate-400 hover:bg-indigo-600 hover:text-white transition-all">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
                       </button>
@@ -410,13 +427,21 @@ const App: React.FC = () => {
       )}
 
       {currentView === 'CREATE_EXPERIMENT' && (
-        <div className="max-w-2xl mx-auto bg-white p-10 rounded-[2.5rem] shadow-2xl view-enter">
+        <div className="max-w-2xl mx-auto bg-white p-8 sm:p-10 rounded-[2.5rem] shadow-2xl view-enter">
           <h2 className="text-2xl font-black mb-8">Nuovo Esperimento</h2>
           <form onSubmit={handleCreateExperiment} className="space-y-6">
-            <input type="text" required placeholder="Titolo" value={expTitle} onChange={e => setExpTitle(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
-            <textarea placeholder="Descrizione e obbiettivi..." value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none h-40" />
-            <button type="submit" disabled={isActionLoading} className="w-full bg-indigo-600 text-white font-bold py-5 rounded-2xl shadow-xl hover:bg-indigo-700 transition-all">Crea Progetto</button>
-            <button type="button" onClick={() => setCurrentView('DASHBOARD')} className="w-full text-slate-400 font-bold py-2 text-center block">Annulla</button>
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase text-slate-400 ml-2">Titolo Progetto</label>
+              <input type="text" required placeholder="Es: Studio sulla memoria a breve termine" value={expTitle} onChange={e => setExpTitle(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none outline-none focus:ring-2 focus:ring-indigo-500 transition-shadow" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase text-slate-400 ml-2">Descrizione</label>
+              <textarea placeholder="Descrizione e obbiettivi scientifici..." value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 border-none outline-none h-40 focus:ring-2 focus:ring-indigo-500 transition-shadow resize-none" />
+            </div>
+            <div className="pt-4 space-y-4">
+              <button type="submit" disabled={isActionLoading} className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-xl hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:opacity-50">Crea Progetto</button>
+              <button type="button" onClick={() => navigateTo('DASHBOARD')} className="w-full text-slate-400 font-bold py-2 text-center block hover:text-slate-600">Annulla</button>
+            </div>
           </form>
         </div>
       )}
@@ -435,7 +460,7 @@ const App: React.FC = () => {
             </select>
             <button type="submit" disabled={isActionLoading} className="w-full bg-indigo-600 text-white font-bold py-5 rounded-2xl shadow-xl">Salva Modifiche</button>
             <button type="button" onClick={handleDeleteExperiment} className="w-full text-red-500 font-bold py-2 text-center block">Elimina Esperimento</button>
-            <button type="button" onClick={() => setCurrentView('EXPERIMENT_DETAILS')} className="w-full text-slate-400 font-bold py-2 text-center block">Torna indietro</button>
+            <button type="button" onClick={() => navigateTo('EXPERIMENT_DETAILS')} className="w-full text-slate-400 font-bold py-2 text-center block">Torna indietro</button>
           </form>
         </div>
       )}
@@ -450,7 +475,7 @@ const App: React.FC = () => {
             <input type="number" required placeholder="Canali" value={sessChannels} onChange={e => setSessChannels(Number(e.target.value))} className="col-span-2 px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
             <textarea placeholder="Note tecniche..." value={sessNotes} onChange={e => setSessNotes(e.target.value)} className="col-span-2 px-6 py-4 rounded-2xl bg-slate-50 outline-none h-32" />
             <button type="submit" disabled={isActionLoading} className="col-span-2 bg-indigo-600 text-white font-bold py-5 rounded-2xl shadow-xl mt-4">Salva Sessione</button>
-            <button type="button" onClick={() => setCurrentView('EXPERIMENT_DETAILS')} className="col-span-2 text-slate-400 font-bold py-2 text-center block">Annulla</button>
+            <button type="button" onClick={() => navigateTo('EXPERIMENT_DETAILS')} className="col-span-2 text-slate-400 font-bold py-2 text-center block">Annulla</button>
           </form>
         </div>
       )}
@@ -466,7 +491,7 @@ const App: React.FC = () => {
             <textarea value={sessNotes} onChange={e => setSessNotes(e.target.value)} className="col-span-2 px-6 py-4 rounded-2xl bg-slate-50 outline-none h-32" />
             <button type="submit" disabled={isActionLoading} className="col-span-2 bg-indigo-600 text-white font-bold py-5 rounded-2xl shadow-xl mt-4">Aggiorna</button>
             <button type="button" onClick={handleDeleteSession} className="col-span-2 text-red-500 font-bold py-2 text-center block">Elimina Sessione</button>
-            <button type="button" onClick={() => setCurrentView('EXPERIMENT_DETAILS')} className="col-span-2 text-slate-400 font-bold py-2 text-center block">Torna indietro</button>
+            <button type="button" onClick={() => navigateTo('EXPERIMENT_DETAILS')} className="col-span-2 text-slate-400 font-bold py-2 text-center block">Torna indietro</button>
           </form>
         </div>
       )}
