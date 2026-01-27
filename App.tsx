@@ -31,6 +31,7 @@ const App: React.FC = () => {
   const [expDesc, setExpDesc] = useState('');
   const [expStatus, setExpStatus] = useState<ExperimentStatus>(ExperimentStatus.PLANNING);
   const [sessSubj, setSessSubj] = useState('');
+  const [sessDate, setSessDate] = useState(new Date().toISOString().split('T')[0]);
   const [sessDuration, setSessDuration] = useState(30);
   const [sessSampling, setSessSampling] = useState(512);
   const [sessChannels, setSessChannels] = useState(32);
@@ -88,6 +89,14 @@ const App: React.FC = () => {
       setExpTitle('');
       setExpDesc('');
       setExpStatus(ExperimentStatus.PLANNING);
+    }
+    if (view === 'ADD_SESSION') {
+      setSessSubj('');
+      setSessDate(new Date().toISOString().split('T')[0]);
+      setSessDuration(30);
+      setSessSampling(512);
+      setSessChannels(32);
+      setSessNotes('');
     }
     if (view === 'DASHBOARD') {
       setSelectedExperimentId(null);
@@ -201,7 +210,7 @@ const App: React.FC = () => {
         id: Math.random().toString(36).substr(2, 9),
         experimentId: selectedExp.id,
         subjectId: sessSubj,
-        date: new Date().toISOString().split('T')[0],
+        date: sessDate,
         durationMinutes: sessDuration,
         samplingRate: sessSampling,
         channelCount: sessChannels,
@@ -223,7 +232,7 @@ const App: React.FC = () => {
     try {
       const updatedSessions = selectedExp.sessions.map(s => 
         String(s.id) === String(selectedSessionId) 
-          ? { ...s, subjectId: sessSubj, durationMinutes: sessDuration, samplingRate: sessSampling, channelCount: sessChannels, notes: sessNotes } 
+          ? { ...s, subjectId: sessSubj, date: sessDate, durationMinutes: sessDuration, samplingRate: sessSampling, channelCount: sessChannels, notes: sessNotes } 
           : s
       );
       await dataService.updateExperiment({ ...selectedExp, sessions: updatedSessions });
@@ -247,6 +256,10 @@ const App: React.FC = () => {
     } finally { setIsActionLoading(false); }
   };
 
+  const handleExportPDF = () => {
+    window.print();
+  };
+
   const getAIProtocolAdvice = async (exp: Experiment) => {
     if (aiLoading) return;
     setAiLoading(true);
@@ -268,7 +281,7 @@ const App: React.FC = () => {
       onNavigate={navigateTo}
     >
       {(isLoading || isActionLoading) && (
-        <div className="fixed top-0 left-0 w-full h-1 bg-indigo-200 z-[200] overflow-hidden">
+        <div className="fixed top-0 left-0 w-full h-1 bg-indigo-200 z-[200] overflow-hidden no-print">
           <div className="h-full bg-indigo-600 animate-[loading_1s_infinite_linear]"></div>
         </div>
       )}
@@ -360,23 +373,69 @@ const App: React.FC = () => {
             </div>
           ) : (
             <>
-              <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
+              {/* Layout di stampa nascosto */}
+              <div className="print-only print-container">
+                <div className="report-header">
+                  <h1 style={{fontSize: '24pt', fontWeight: 'bold'}}>EEG Lab Manager - Report Esperimento</h1>
+                  <p>Data Report: {new Date().toLocaleDateString()}</p>
+                  <p>Ricercatore: {user?.name}</p>
+                </div>
+                <div style={{marginBottom: '20px'}}>
+                  <h2 style={{fontSize: '18pt', fontWeight: 'bold'}}>{selectedExp.title}</h2>
+                  <p style={{fontSize: '11pt', marginTop: '10px'}}>{selectedExp.description}</p>
+                  <p style={{marginTop: '5px'}}>Status: <strong>{selectedExp.status}</strong> | Data Inizio: {selectedExp.startDate}</p>
+                </div>
+                <h3>Lista Sessioni</h3>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Soggetto</th>
+                      <th>Durata</th>
+                      <th>Sampling</th>
+                      <th>Canali</th>
+                      <th>Note</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedExp.sessions.map(s => (
+                      <tr key={s.id}>
+                        <td>{s.date}</td>
+                        <td>{s.subjectId}</td>
+                        <td>{s.durationMinutes} min</td>
+                        <td>{s.samplingRate} Hz</td>
+                        <td>{s.channelCount}</td>
+                        <td>{s.notes || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100 no-print">
                 <div className="flex justify-between items-start mb-6">
                   <div className="flex-1">
                     <h2 className="text-3xl font-black text-slate-900 tracking-tighter mb-2">{selectedExp.title}</h2>
                     <p className="text-slate-500 text-sm whitespace-pre-wrap">{selectedExp.description}</p>
                   </div>
-                  <button onClick={() => { 
-                    setExpTitle(selectedExp.title); 
-                    setExpDesc(selectedExp.description); 
-                    setExpStatus(selectedExp.status); 
-                    navigateTo('EDIT_EXPERIMENT'); 
-                  }} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:text-indigo-600 transition-colors">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
-                  </button>
+                  <div className="flex space-x-2">
+                    <button onClick={handleExportPDF} className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-100 transition-colors" title="Esporta PDF">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </button>
+                    <button onClick={() => { 
+                      setExpTitle(selectedExp.title); 
+                      setExpDesc(selectedExp.description); 
+                      setExpStatus(selectedExp.status); 
+                      navigateTo('EDIT_EXPERIMENT'); 
+                    }} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:text-indigo-600 transition-colors">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
+                    </button>
+                  </div>
                 </div>
                 
-                <div className="flex space-x-3 pt-6 border-t border-slate-50">
+                <div className="flex flex-wrap gap-3 pt-6 border-t border-slate-50">
                   <button 
                     onClick={() => getAIProtocolAdvice(selectedExp)} 
                     disabled={aiLoading}
@@ -386,6 +445,10 @@ const App: React.FC = () => {
                     {aiLoading ? 'Analisi...' : 'Suggerimenti AI'}
                   </button>
                   <button onClick={() => navigateTo('ADD_SESSION')} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase shadow-lg active:scale-95 transition-all">Nuova Sessione</button>
+                  <button onClick={handleExportPDF} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase shadow-lg active:scale-95 transition-all flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                    Esporta Report
+                  </button>
                 </div>
 
                 {aiResponse && (
@@ -397,7 +460,7 @@ const App: React.FC = () => {
                 )}
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-4 no-print">
                 <h3 className="text-xl font-black text-slate-800 ml-6">Sessioni ({selectedExp.sessions.length})</h3>
                 <div className="grid gap-4 sm:grid-cols-2">
                   {selectedExp.sessions.map(sess => (
@@ -409,6 +472,7 @@ const App: React.FC = () => {
                       <button onClick={() => { 
                         setSelectedSessionId(String(sess.id));
                         setSessSubj(sess.subjectId);
+                        setSessDate(sess.date);
                         setSessDuration(sess.durationMinutes);
                         setSessSampling(sess.samplingRate);
                         setSessChannels(sess.channelCount);
@@ -427,7 +491,7 @@ const App: React.FC = () => {
       )}
 
       {currentView === 'CREATE_EXPERIMENT' && (
-        <div className="max-w-2xl mx-auto bg-white p-8 sm:p-10 rounded-[2.5rem] shadow-2xl view-enter">
+        <div className="max-w-2xl mx-auto bg-white p-8 sm:p-10 rounded-[2.5rem] shadow-2xl view-enter no-print">
           <h2 className="text-2xl font-black mb-8">Nuovo Esperimento</h2>
           <form onSubmit={handleCreateExperiment} className="space-y-6">
             <div className="space-y-2">
@@ -447,7 +511,7 @@ const App: React.FC = () => {
       )}
 
       {currentView === 'EDIT_EXPERIMENT' && selectedExp && (
-        <div className="max-w-2xl mx-auto bg-white p-10 rounded-[2.5rem] shadow-2xl view-enter">
+        <div className="max-w-2xl mx-auto bg-white p-10 rounded-[2.5rem] shadow-2xl view-enter no-print">
           <h2 className="text-2xl font-black mb-8">Gestisci Esperimento</h2>
           <form onSubmit={handleUpdateExperiment} className="space-y-6">
             <input type="text" required value={expTitle} onChange={e => setExpTitle(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
@@ -466,29 +530,67 @@ const App: React.FC = () => {
       )}
 
       {currentView === 'ADD_SESSION' && selectedExp && (
-        <div className="max-w-2xl mx-auto bg-white p-10 rounded-[2.5rem] shadow-2xl view-enter">
+        <div className="max-w-2xl mx-auto bg-white p-10 rounded-[2.5rem] shadow-2xl view-enter no-print">
           <h2 className="text-2xl font-black mb-8">Registra Sessione</h2>
           <form onSubmit={handleAddSession} className="grid grid-cols-2 gap-4">
-            <input type="text" required placeholder="ID Soggetto" value={sessSubj} onChange={e => setSessSubj(e.target.value)} className="col-span-2 px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
-            <input type="number" required placeholder="Durata (min)" value={sessDuration} onChange={e => setSessDuration(Number(e.target.value))} className="px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
-            <input type="number" required placeholder="Sampling (Hz)" value={sessSampling} onChange={e => setSessSampling(Number(e.target.value))} className="px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
-            <input type="number" required placeholder="Canali" value={sessChannels} onChange={e => setSessChannels(Number(e.target.value))} className="col-span-2 px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
-            <textarea placeholder="Note tecniche..." value={sessNotes} onChange={e => setSessNotes(e.target.value)} className="col-span-2 px-6 py-4 rounded-2xl bg-slate-50 outline-none h-32" />
-            <button type="submit" disabled={isActionLoading} className="col-span-2 bg-indigo-600 text-white font-bold py-5 rounded-2xl shadow-xl mt-4">Salva Sessione</button>
+            <div className="col-span-2 space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">ID Soggetto</label>
+              <input type="text" required placeholder="Es: SUBJ-001" value={sessSubj} onChange={e => setSessSubj(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Data Registrazione</label>
+              <input type="date" required value={sessDate} onChange={e => setSessDate(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Durata (min)</label>
+              <input type="number" required placeholder="min" value={sessDuration} onChange={e => setSessDuration(Number(e.target.value))} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Sampling (Hz)</label>
+              <input type="number" required placeholder="Hz" value={sessSampling} onChange={e => setSessSampling(Number(e.target.value))} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Numero Canali</label>
+              <input type="number" required placeholder="Es: 32" value={sessChannels} onChange={e => setSessChannels(Number(e.target.value))} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Note Sessione</label>
+              <textarea placeholder="Note tecniche..." value={sessNotes} onChange={e => setSessNotes(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none h-32" />
+            </div>
+            <button type="submit" disabled={isActionLoading} className="col-span-2 bg-indigo-600 text-white font-bold py-5 rounded-2xl shadow-xl mt-4 active:scale-95 transition-transform">Salva Sessione</button>
             <button type="button" onClick={() => navigateTo('EXPERIMENT_DETAILS')} className="col-span-2 text-slate-400 font-bold py-2 text-center block">Annulla</button>
           </form>
         </div>
       )}
 
       {currentView === 'EDIT_SESSION' && selectedExp && (
-        <div className="max-w-2xl mx-auto bg-white p-10 rounded-[2.5rem] shadow-2xl view-enter">
+        <div className="max-w-2xl mx-auto bg-white p-10 rounded-[2.5rem] shadow-2xl view-enter no-print">
           <h2 className="text-2xl font-black mb-8">Dettagli Sessione</h2>
           <form onSubmit={handleUpdateSession} className="grid grid-cols-2 gap-4">
-            <input type="text" required value={sessSubj} onChange={e => setSessSubj(e.target.value)} className="col-span-2 px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
-            <input type="number" required value={sessDuration} onChange={e => setSessDuration(Number(e.target.value))} className="px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
-            <input type="number" required value={sessSampling} onChange={e => setSessSampling(Number(e.target.value))} className="px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
-            <input type="number" required value={sessChannels} onChange={e => setSessChannels(Number(e.target.value))} className="col-span-2 px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
-            <textarea value={sessNotes} onChange={e => setSessNotes(e.target.value)} className="col-span-2 px-6 py-4 rounded-2xl bg-slate-50 outline-none h-32" />
+            <div className="col-span-2 space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">ID Soggetto</label>
+              <input type="text" required value={sessSubj} onChange={e => setSessSubj(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Data Registrazione</label>
+              <input type="date" required value={sessDate} onChange={e => setSessDate(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Durata (min)</label>
+              <input type="number" required value={sessDuration} onChange={e => setSessDuration(Number(e.target.value))} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Sampling (Hz)</label>
+              <input type="number" required value={sessSampling} onChange={e => setSessSampling(Number(e.target.value))} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Numero Canali</label>
+              <input type="number" required value={sessChannels} onChange={e => setSessChannels(Number(e.target.value))} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
+            </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Note Sessione</label>
+              <textarea value={sessNotes} onChange={e => setSessNotes(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none h-32" />
+            </div>
             <button type="submit" disabled={isActionLoading} className="col-span-2 bg-indigo-600 text-white font-bold py-5 rounded-2xl shadow-xl mt-4">Aggiorna</button>
             <button type="button" onClick={handleDeleteSession} className="col-span-2 text-red-500 font-bold py-2 text-center block">Elimina Sessione</button>
             <button type="button" onClick={() => navigateTo('EXPERIMENT_DETAILS')} className="col-span-2 text-slate-400 font-bold py-2 text-center block">Torna indietro</button>
@@ -497,7 +599,7 @@ const App: React.FC = () => {
       )}
 
       {currentView === 'MANAGE_USERS' && user?.role === 'Admin' && (
-        <div className="max-w-4xl mx-auto space-y-8 view-enter pb-24">
+        <div className="max-w-4xl mx-auto space-y-8 view-enter pb-24 no-print">
           <div className="bg-white p-6 sm:p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-4">
               <h2 className="text-3xl font-black text-slate-900 tracking-tight italic">Team del Lab</h2>
