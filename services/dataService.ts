@@ -1,6 +1,8 @@
 import { User, Experiment, Session } from "../types";
 import { supabase } from "./supabaseClient";
 
+const SESSION_PHOTOS_BUCKET = "session-photos";
+
 export const dataService = {
   // Gestione Utenti
   getUsers: async (): Promise<User[]> => {
@@ -108,7 +110,8 @@ export const dataService = {
         samplingRate: s.sampling_rate,
         channelCount: s.channel_count,
         notes: s.notes,
-        technicianName: s.technician_name
+        technicianName: s.technician_name,
+        photos: Array.isArray(s.photos) ? s.photos : [] // NEW
       }))
     })) as Experiment[];
   },
@@ -148,12 +151,45 @@ export const dataService = {
         sampling_rate: sess.samplingRate,
         channel_count: sess.channelCount,
         notes: sess.notes,
-        technician_name: sess.technicianName
+        technician_name: sess.technicianName,
+        photos: sess.photos ?? []
       }));
       
       const { error: sessError } = await supabase.from('sessions').upsert(sessionsToUpsert);
       if (sessError) throw sessError;
     }
+  },
+
+  uploadSessionPhotos: async (params: {
+    files: File[];
+    userId: string;
+    experimentId: string;
+    sessionId: string;
+  }): Promise<string[]> => {
+    const { files, userId, experimentId, sessionId } = params;
+
+    const urls: string[] = [];
+
+    for (const f of files) {
+      const safeName = f.name.replace(/[^\w.\-]+/g, "_");
+      const path = `${userId}/${experimentId}/${sessionId}/${Date.now()}_${Math.random()
+        .toString(16)
+        .slice(2)}_${safeName}`;
+
+      const { error: upErr } = await supabase.storage
+        .from(SESSION_PHOTOS_BUCKET)
+        .upload(path, f, { cacheControl: "3600", upsert: false });
+
+      if (upErr) throw upErr;
+
+      const { data } = supabase.storage
+        .from(SESSION_PHOTOS_BUCKET)
+        .getPublicUrl(path);
+
+      if (data?.publicUrl) urls.push(data.publicUrl);
+    }
+
+    return urls;
   },
 
   deleteExperiment: async (id: string) => {
@@ -165,4 +201,6 @@ export const dataService = {
     const { error } = await supabase.from('sessions').delete().eq('id', sessionId);
     if (error) throw error;
   }
+
+  
 };

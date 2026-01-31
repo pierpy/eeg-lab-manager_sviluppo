@@ -23,6 +23,7 @@ export interface Session {
   channelCount: number; // e.g., 32, 64, 128
   notes: string;
   technicianName: string;
+  photos?: string[]; // NEW
 }
 
 export interface Experiment {

@@ -7,6 +7,9 @@ import { dataService } from './services/dataService';
 
 const { useState, useEffect, useCallback, useMemo } = React;
 
+const [sessPhotoFiles, setSessPhotoFiles] = useState<File[]>([]);
+const [sessPhotos, setSessPhotos] = useState<string[]>([]); // usato in EDIT_SESSION (urls esistenti)
+
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
   const [experiments, setExperiments] = useState<Experiment[]>([]);
@@ -43,7 +46,7 @@ const App: React.FC = () => {
     try {
       const exps = await dataService.getExperiments(activeUser);
       setExperiments(exps);
-      
+
       if (activeUser.role === 'Admin') {
         const users = await dataService.getUsers();
         setAllUsers(users);
@@ -97,6 +100,8 @@ const App: React.FC = () => {
       setSessSampling(512);
       setSessChannels(32);
       setSessNotes('');
+      setSessPhotoFiles([]);
+      setSessPhotos([]);
     }
     if (view === 'DASHBOARD') {
       setSelectedExperimentId(null);
@@ -135,9 +140,9 @@ const App: React.FC = () => {
         alert("Codice invito non valido.");
         return;
       }
-      const newUser: User = { 
-        id: Math.random().toString(36).substr(2, 9), 
-        name, email, role 
+      const newUser: User = {
+        id: Math.random().toString(36).substr(2, 9),
+        name, email, role
       };
       await dataService.saveUser(newUser);
       setUser(newUser);
@@ -170,8 +175,8 @@ const App: React.FC = () => {
       navigateTo('DASHBOARD');
     } catch (err: any) {
       alert("Errore creazione: " + err.message);
-    } finally { 
-      setIsActionLoading(false); 
+    } finally {
+      setIsActionLoading(false);
     }
   };
 
@@ -230,9 +235,9 @@ const App: React.FC = () => {
     if (!selectedExp || !user || !selectedSessionId) return;
     setIsActionLoading(true);
     try {
-      const updatedSessions = selectedExp.sessions.map(s => 
-        String(s.id) === String(selectedSessionId) 
-          ? { ...s, subjectId: sessSubj, date: sessDate, durationMinutes: sessDuration, samplingRate: sessSampling, channelCount: sessChannels, notes: sessNotes } 
+      const updatedSessions = selectedExp.sessions.map(s =>
+        String(s.id) === String(selectedSessionId)
+          ? { ...s, subjectId: sessSubj, date: sessDate, durationMinutes: sessDuration, samplingRate: sessSampling, channelCount: sessChannels, notes: sessNotes }
           : s
       );
       await dataService.updateExperiment({ ...selectedExp, sessions: updatedSessions });
@@ -275,9 +280,9 @@ const App: React.FC = () => {
   };
 
   return (
-    <Layout 
-      user={user} 
-      onLogout={() => { setUser(null); localStorage.removeItem('eeg_lab_active_user'); navigateTo('LOGIN'); }} 
+    <Layout
+      user={user}
+      onLogout={() => { setUser(null); localStorage.removeItem('eeg_lab_active_user'); navigateTo('LOGIN'); }}
       onNavigate={navigateTo}
     >
       {(isLoading || isActionLoading) && (
@@ -340,12 +345,12 @@ const App: React.FC = () => {
               </div>
             )}
             {experiments.map(exp => (
-              <div 
-                key={String(exp.id)} 
-                onClick={() => { 
-                  setSelectedExperimentId(String(exp.id)); 
-                  navigateTo('EXPERIMENT_DETAILS'); 
-                }} 
+              <div
+                key={String(exp.id)}
+                onClick={() => {
+                  setSelectedExperimentId(String(exp.id));
+                  navigateTo('EXPERIMENT_DETAILS');
+                }}
                 className="bg-white p-6 rounded-[2.2rem] border border-slate-100 shadow-sm hover:shadow-xl hover:border-indigo-200 transition-all cursor-pointer group active:scale-[0.98]"
               >
                 <div className="flex justify-between items-start mb-4">
@@ -376,14 +381,14 @@ const App: React.FC = () => {
               {/* Layout di stampa nascosto */}
               <div className="print-only print-container">
                 <div className="report-header">
-                  <h1 style={{fontSize: '24pt', fontWeight: 'bold'}}>EEG Lab Manager - Report Esperimento</h1>
+                  <h1 style={{ fontSize: '24pt', fontWeight: 'bold' }}>EEG Lab Manager - Report Esperimento</h1>
                   <p>Data Report: {new Date().toLocaleDateString()}</p>
                   <p>Ricercatore: {user?.name}</p>
                 </div>
-                <div style={{marginBottom: '20px'}}>
-                  <h2 style={{fontSize: '18pt', fontWeight: 'bold'}}>{selectedExp.title}</h2>
-                  <p style={{fontSize: '11pt', marginTop: '10px'}}>{selectedExp.description}</p>
-                  <p style={{marginTop: '5px'}}>Status: <strong>{selectedExp.status}</strong> | Data Inizio: {selectedExp.startDate}</p>
+                <div style={{ marginBottom: '20px' }}>
+                  <h2 style={{ fontSize: '18pt', fontWeight: 'bold' }}>{selectedExp.title}</h2>
+                  <p style={{ fontSize: '11pt', marginTop: '10px' }}>{selectedExp.description}</p>
+                  <p style={{ marginTop: '5px' }}>Status: <strong>{selectedExp.status}</strong> | Data Inizio: {selectedExp.startDate}</p>
                 </div>
                 <h3>Lista Sessioni</h3>
                 <table>
@@ -424,20 +429,20 @@ const App: React.FC = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                     </button>
-                    <button onClick={() => { 
-                      setExpTitle(selectedExp.title); 
-                      setExpDesc(selectedExp.description); 
-                      setExpStatus(selectedExp.status); 
-                      navigateTo('EDIT_EXPERIMENT'); 
+                    <button onClick={() => {
+                      setExpTitle(selectedExp.title);
+                      setExpDesc(selectedExp.description);
+                      setExpStatus(selectedExp.status);
+                      navigateTo('EDIT_EXPERIMENT');
                     }} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:text-indigo-600 transition-colors">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
                     </button>
                   </div>
                 </div>
-                
+
                 <div className="flex flex-wrap gap-3 pt-6 border-t border-slate-50">
-                  <button 
-                    onClick={() => getAIProtocolAdvice(selectedExp)} 
+                  <button
+                    onClick={() => getAIProtocolAdvice(selectedExp)}
                     disabled={aiLoading}
                     className="bg-slate-900 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase flex items-center shadow-lg active:scale-95 transition-all"
                   >
@@ -469,7 +474,7 @@ const App: React.FC = () => {
                         <div className="font-bold text-slate-900">Sogg: {sess.subjectId}</div>
                         <div className="text-[10px] font-bold text-slate-400 uppercase">{sess.date} • {sess.durationMinutes} min</div>
                       </div>
-                      <button onClick={() => { 
+                      <button onClick={() => {
                         setSelectedSessionId(String(sess.id));
                         setSessSubj(sess.subjectId);
                         setSessDate(sess.date);
@@ -477,7 +482,9 @@ const App: React.FC = () => {
                         setSessSampling(sess.samplingRate);
                         setSessChannels(sess.channelCount);
                         setSessNotes(sess.notes);
-                        navigateTo('EDIT_SESSION'); 
+                        setSessPhotos(sess.photos ?? []); // <<<<<< QUI
+                        setSessPhotoFiles([]);           // <<<<<< QUI
+                        navigateTo('EDIT_SESSION');
                       }} className="p-4 bg-slate-50 rounded-2xl text-slate-400 hover:bg-indigo-600 hover:text-white transition-all">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>
                       </button>
@@ -557,6 +564,16 @@ const App: React.FC = () => {
               <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Note Sessione</label>
               <textarea placeholder="Note tecniche..." value={sessNotes} onChange={e => setSessNotes(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none h-32" />
             </div>
+            <div className="col-span-2 space-y-1">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Foto (opzionali)</label>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => setSessPhotoFiles(Array.from(e.target.files || []))}
+                className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none"
+              />
+            </div>
             <button type="submit" disabled={isActionLoading} className="col-span-2 bg-indigo-600 text-white font-bold py-5 rounded-2xl shadow-xl mt-4 active:scale-95 transition-transform">Salva Sessione</button>
             <button type="button" onClick={() => navigateTo('EXPERIMENT_DETAILS')} className="col-span-2 text-slate-400 font-bold py-2 text-center block">Annulla</button>
           </form>
@@ -603,18 +620,18 @@ const App: React.FC = () => {
           <div className="bg-white p-6 sm:p-10 rounded-[2.5rem] shadow-sm border border-slate-100">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-4">
               <h2 className="text-3xl font-black text-slate-900 tracking-tight italic">Team del Lab</h2>
-              <button 
-                onClick={async () => { 
+              <button
+                onClick={async () => {
                   setIsActionLoading(true);
                   try {
-                    const code = await dataService.generateInvite(); 
-                    setGeneratedInvite(code); 
+                    const code = await dataService.generateInvite();
+                    setGeneratedInvite(code);
                   } catch (e) {
                     alert("Errore generazione invito");
                   } finally {
                     setIsActionLoading(false);
                   }
-                }} 
+                }}
                 className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-indigo-100 active:scale-95 transition-all"
               >
                 Crea Codice Invito
@@ -627,11 +644,11 @@ const App: React.FC = () => {
                   <div className="text-[10px] font-black uppercase text-emerald-500 mb-1">Nuovo Codice Invito Ricercatore:</div>
                   <div className="text-3xl font-black text-emerald-700 tracking-widest uppercase select-all">{generatedInvite}</div>
                 </div>
-                <button 
-                  onClick={() => { 
-                    navigator.clipboard.writeText(generatedInvite); 
-                    alert("Codice Copiato in memoria!"); 
-                  }} 
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(generatedInvite);
+                    alert("Codice Copiato in memoria!");
+                  }}
                   className="bg-white text-emerald-600 px-6 py-3 rounded-2xl font-black text-xs shadow-sm hover:shadow-md transition-shadow"
                 >
                   COPIA CODICE
@@ -653,14 +670,14 @@ const App: React.FC = () => {
                   </div>
                   <div className="flex items-center space-x-2 w-full sm:w-auto">
                     <span className="text-[10px] font-black uppercase text-slate-300">Ruolo:</span>
-                    <select 
-                      value={u.role} 
+                    <select
+                      value={u.role}
                       onChange={(e) => {
                         const newRole = e.target.value as any;
                         if (confirm(`Cambiare il ruolo di ${u.name} in ${newRole}?`)) {
                           dataService.updateUserRole(u.id, newRole).then(() => user && refreshData(user));
                         }
-                      }} 
+                      }}
                       className="w-full sm:w-auto bg-white border-2 border-slate-100 rounded-xl text-[10px] font-black px-4 py-2 focus:ring-2 focus:ring-indigo-500 outline-none uppercase tracking-tighter shadow-sm"
                     >
                       <option value="Admin">Admin</option>
