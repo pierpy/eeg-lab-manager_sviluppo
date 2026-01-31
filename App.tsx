@@ -7,8 +7,7 @@ import { dataService } from './services/dataService';
 
 const { useState, useEffect, useCallback, useMemo } = React;
 
-const [sessPhotoFiles, setSessPhotoFiles] = useState<File[]>([]);
-const [sessPhotos, setSessPhotos] = useState<string[]>([]); // usato in EDIT_SESSION (urls esistenti)
+
 
 const App: React.FC = () => {
   const [user, setUser] = useState<User | null>(null);
@@ -21,6 +20,7 @@ const App: React.FC = () => {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
+
 
   // Form States
   const [email, setEmail] = useState('');
@@ -39,6 +39,9 @@ const App: React.FC = () => {
   const [sessSampling, setSessSampling] = useState(512);
   const [sessChannels, setSessChannels] = useState(32);
   const [sessNotes, setSessNotes] = useState('');
+
+  const [sessPhotoFiles, setSessPhotoFiles] = useState<File[]>([]);
+  const [sessPhotos, setSessPhotos] = useState<string[]>([]); // usato in EDIT_SESSION (urls esistenti)
 
   // Sincronizzazione dati
   const refreshData = useCallback(async (activeUser: User) => {
