@@ -129,6 +129,7 @@ export const dataService = {
   },
 
   updateExperiment: async (updatedExp: Experiment) => {
+    console.log('sto aggiornando l\'esperimento:', updatedExp);
     const { error: expError } = await supabase
       .from('experiments')
       .update({
