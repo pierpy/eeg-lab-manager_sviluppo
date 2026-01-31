@@ -222,6 +222,16 @@ const App: React.FC = () => {
         notes: sessNotes,
         technicianName: user.name
       };
+      let photoUrls: string[] = [];
+      if (sessPhotoFiles.length) {
+        photoUrls = await dataService.uploadSessionPhotos({
+          files: sessPhotoFiles,
+          userId: user.id,
+          experimentId: selectedExp.id,
+          sessionId: newSession.id,
+        });
+      }
+      newSession.photos = photoUrls;
       await dataService.updateExperiment({ ...selectedExp, sessions: [...selectedExp.sessions, newSession] });
       await refreshData(user);
       navigateTo('EXPERIMENT_DETAILS');
@@ -607,6 +617,40 @@ const App: React.FC = () => {
             <div className="col-span-2 space-y-1">
               <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Note Sessione</label>
               <textarea value={sessNotes} onChange={e => setSessNotes(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none h-32" />
+            </div>
+            
+            <div className="col-span-2 space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">
+                Foto
+              </label>
+
+              {sessPhotos.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {sessPhotos.map((url, i) => (
+                    <div key={i} className="relative">
+                      <a href={url} target="_blank" rel="noreferrer">
+                        <img src={url} className="w-20 h-20 rounded-2xl object-cover border" />
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => setSessPhotos(p => p.filter((_, idx) => idx !== i))}
+                        className="absolute -top-2 -right-2 w-6 h-6 rounded-full bg-white border text-slate-600 font-black"
+                        title="Rimuovi"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => setSessPhotoFiles(Array.from(e.target.files || []))}
+                className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none"
+              />
             </div>
             <button type="submit" disabled={isActionLoading} className="col-span-2 bg-indigo-600 text-white font-bold py-5 rounded-2xl shadow-xl mt-4">Aggiorna</button>
             <button type="button" onClick={handleDeleteSession} className="col-span-2 text-red-500 font-bold py-2 text-center block">Elimina Sessione</button>
