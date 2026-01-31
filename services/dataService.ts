@@ -12,10 +12,10 @@ export const dataService = {
       return data as User[];
     } catch (error: any) {
       console.warn("Accesso limitato alla lista utenti (normale per non-admin):", error.message);
-      return []; 
+      return [];
     }
   },
-  
+
   saveUser: async (user: User) => {
     const { error } = await supabase.from('users').insert([{
       id: user.id,
@@ -33,7 +33,7 @@ export const dataService = {
         .select('*')
         .eq('email', email)
         .maybeSingle();
-      
+
       if (error) {
         if (error.code === 'PGRST116') return undefined;
         throw error;
@@ -68,7 +68,7 @@ export const dataService = {
       .select('role')
       .eq('code', normalizedCode)
       .single();
-    
+
     if (error || !data) {
       console.error("Validazione invito fallita:", error?.message);
       return null;
@@ -77,21 +77,21 @@ export const dataService = {
     if (normalizedCode !== 'LAB-2025') {
       await supabase.from('invites').delete().eq('code', normalizedCode);
     }
-    
+
     return data.role as 'Admin' | 'Researcher';
   },
 
   // Gestione Esperimenti
   getExperiments: async (user: User): Promise<Experiment[]> => {
     let query = supabase.from('experiments').select('*, sessions(*)');
-    
+
     // Filtro cruciale: se non è admin, carica solo i suoi.
     if (user.role !== 'Admin') {
       query = query.eq('user_id', user.id);
     }
 
     const { data, error } = await query.order('start_date', { ascending: false });
-    
+
     if (error) {
       console.error("Errore fetch esperimenti:", error.message);
       throw error;
@@ -137,7 +137,7 @@ export const dataService = {
         status: updatedExp.status
       })
       .eq('id', updatedExp.id);
-    
+
     if (expError) throw expError;
 
     // Aggiornamento/Inserimento sessioni
@@ -154,9 +154,16 @@ export const dataService = {
         technician_name: sess.technicianName,
         photos: sess.photos ?? []
       }));
-      
-      const { error: sessError } = await supabase.from('sessions').upsert(sessionsToUpsert);
+
+      const { data: sessData, error: sessError } = await supabase
+        .from('sessions')
+        .upsert(sessionsToUpsert)
+        .select('id, photos');
+
       if (sessError) throw sessError;
+
+      console.log('UPSERT sessions ->', sessData);
+      console.log('UPSERT sessions payload ->', sessionsToUpsert);
     }
   },
 
@@ -202,5 +209,5 @@ export const dataService = {
     if (error) throw error;
   }
 
-  
+
 };

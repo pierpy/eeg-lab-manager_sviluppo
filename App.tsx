@@ -487,6 +487,24 @@ const App: React.FC = () => {
                         <div className="font-bold text-slate-900">Sogg: {sess.subjectId}</div>
                         <div className="text-[10px] font-bold text-slate-400 uppercase">{sess.date} • {sess.durationMinutes} min</div>
                       </div>
+                      {sess.photos && sess.photos.length > 0 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {sess.photos.slice(0, 6).map((url, i) => (
+                            <a key={i} href={url} target="_blank" rel="noreferrer" className="block">
+                              <img
+                                src={url}
+                                alt={`sess-${sess.id}-photo-${i}`}
+                                className="w-16 h-16 rounded-2xl object-cover border border-slate-200 hover:border-indigo-300 transition-colors"
+                              />
+                            </a>
+                          ))}
+                          {sess.photos.length > 6 && (
+                            <div className="w-16 h-16 rounded-2xl border border-slate-200 bg-slate-50 flex items-center justify-center text-xs font-black text-slate-400">
+                              +{sess.photos.length - 6}
+                            </div>
+                          )}
+                        </div>
+                      )}
                       <button onClick={() => {
                         setSelectedSessionId(String(sess.id));
                         setSessSubj(sess.subjectId);
@@ -621,7 +639,7 @@ const App: React.FC = () => {
               <label className="text-[10px] font-black uppercase text-slate-400 ml-2">Note Sessione</label>
               <textarea value={sessNotes} onChange={e => setSessNotes(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none h-32" />
             </div>
-            
+
             <div className="col-span-2 space-y-2">
               <label className="text-[10px] font-black uppercase text-slate-400 ml-2">
                 Foto
