@@ -595,7 +595,7 @@ const App: React.FC = () => {
           <h2 className="text-2xl font-black mb-8">Dettagli Sessione</h2>
           <form onSubmit={handleUpdateSession} className="grid grid-cols-2 gap-4">
             <div className="col-span-2 space-y-1">
-              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">ID Soggetto</label>
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-2">ID Subject</label>
               <input type="text" required value={sessSubj} onChange={e => setSessSubj(e.target.value)} className="w-full px-6 py-4 rounded-2xl bg-slate-50 outline-none" />
             </div>
             <div className="col-span-2 space-y-1">
