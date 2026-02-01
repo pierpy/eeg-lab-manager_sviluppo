@@ -234,7 +234,9 @@ const App: React.FC = () => {
           sessionId: newSession.id,
         });
       }
+      console.log("photoUrls ritornate:", photoUrls);
       newSession.photos = photoUrls;
+      console.log("newSession prima di updateExperiment:", newSession);
       await dataService.updateExperiment({ ...selectedExp, sessions: [...selectedExp.sessions, newSession] });
       await refreshData(user);
       navigateTo('EXPERIMENT_DETAILS');

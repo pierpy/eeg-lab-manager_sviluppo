@@ -129,7 +129,7 @@ export const dataService = {
   },
 
   updateExperiment: async (updatedExp: Experiment) => {
-    
+
     const { error: expError } = await supabase
       .from('experiments')
       .update({
@@ -144,6 +144,7 @@ export const dataService = {
     // Aggiornamento/Inserimento sessioni
     if (updatedExp.sessions.length > 0) {
       console.log('sto aggiornando l\'esperimento:', updatedExp);
+
       const sessionsToUpsert = updatedExp.sessions.map(sess => ({
         id: sess.id,
         experiment_id: updatedExp.id,
@@ -156,16 +157,15 @@ export const dataService = {
         technician_name: sess.technicianName,
         photos: sess.photos ?? []
       }));
+      const last = sessionsToUpsert[sessionsToUpsert.length - 1];
 
-      const { data: sessData, error: sessError } = await supabase
-        .from('sessions')
-        .upsert(sessionsToUpsert)
-        .select('id, photos');
+      const { data: check, error: checkErr } = await supabase
+        .from("sessions")
+        .select("id, photos")
+        .eq("id", last.id)
+        .maybeSingle();
 
-      if (sessError) throw sessError;
-
-      console.log('UPSERT sessions ->', sessData);
-      console.log('UPSERT sessions payload ->', sessionsToUpsert);
+      console.log("CHECK dal DB subito dopo upsert:", check, checkErr);
     }
   },
 
