@@ -129,7 +129,7 @@ export const dataService = {
   },
 
   updateExperiment: async (updatedExp: Experiment) => {
-    console.log('sto aggiornando l\'esperimento:', updatedExp);
+    
     const { error: expError } = await supabase
       .from('experiments')
       .update({
@@ -143,6 +143,7 @@ export const dataService = {
 
     // Aggiornamento/Inserimento sessioni
     if (updatedExp.sessions.length > 0) {
+      console.log('sto aggiornando l\'esperimento:', updatedExp);
       const sessionsToUpsert = updatedExp.sessions.map(sess => ({
         id: sess.id,
         experiment_id: updatedExp.id,

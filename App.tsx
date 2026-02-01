@@ -243,23 +243,55 @@ const App: React.FC = () => {
     } finally { setIsActionLoading(false); }
   };
 
-  const handleUpdateSession = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedExp || !user || !selectedSessionId) return;
-    setIsActionLoading(true);
-    try {
-      const updatedSessions = selectedExp.sessions.map(s =>
-        String(s.id) === String(selectedSessionId)
-          ? { ...s, subjectId: sessSubj, date: sessDate, durationMinutes: sessDuration, samplingRate: sessSampling, channelCount: sessChannels, notes: sessNotes }
-          : s
-      );
-      await dataService.updateExperiment({ ...selectedExp, sessions: updatedSessions });
-      await refreshData(user);
-      navigateTo('EXPERIMENT_DETAILS');
-    } catch (err: any) {
-      alert("Errore aggiornamento sessione: " + err.message);
-    } finally { setIsActionLoading(false); }
-  };
+const handleUpdateSession = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!selectedExp || !user || !selectedSessionId) return;
+
+  setIsActionLoading(true);
+  try {
+    // 1) upload eventuali nuove foto selezionate
+    let newUrls: string[] = [];
+    if (sessPhotoFiles.length) {
+      newUrls = await dataService.uploadSessionPhotos({
+        files: sessPhotoFiles,
+        userId: user.id,
+        experimentId: selectedExp.id,
+        sessionId: selectedSessionId,
+      });
+    }
+
+    // 2) unisci foto già presenti (sessPhotos) + nuove
+    const mergedPhotos = [...(sessPhotos ?? []), ...newUrls];
+
+    // 3) aggiorna la sessione includendo photos
+    const updatedSessions = selectedExp.sessions.map(s =>
+      String(s.id) === String(selectedSessionId)
+        ? {
+            ...s,
+            subjectId: sessSubj,
+            date: sessDate,
+            durationMinutes: sessDuration,
+            samplingRate: sessSampling,
+            channelCount: sessChannels,
+            notes: sessNotes,
+            photos: mergedPhotos,
+          }
+        : s
+    );
+
+    await dataService.updateExperiment({ ...selectedExp, sessions: updatedSessions });
+    await refreshData(user);
+
+    // reset file selezionati (opzionale ma consigliato)
+    setSessPhotoFiles([]);
+
+    navigateTo('EXPERIMENT_DETAILS');
+  } catch (err: any) {
+    alert("Errore aggiornamento sessione: " + err.message);
+  } finally {
+    setIsActionLoading(false);
+  }
+};
 
   const handleDeleteSession = async () => {
     if (!selectedSessionId || !user) return;
